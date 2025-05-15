@@ -14,7 +14,7 @@ import (
 	yaml_config "github.com/humanbelnik/load-balancer/internal/config/yaml"
 	"github.com/humanbelnik/load-balancer/internal/policy/rr"
 	"github.com/humanbelnik/load-balancer/internal/pool/config_watcher"
-	"github.com/humanbelnik/load-balancer/internal/pool/dynamic_pool.go"
+	"github.com/humanbelnik/load-balancer/internal/pool/dynamic_pool"
 	"github.com/humanbelnik/load-balancer/internal/server/factory"
 )
 
