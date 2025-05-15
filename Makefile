@@ -25,10 +25,17 @@ lint:
 	@go vet ./...
 	@which golint >/dev/null && golint ./... || echo "golint not installed"
 
-test:
+test: mock
 	@echo "Testing..."
 	@go test -v ./...
 
 clean:
 	@echo "Cleaning..."
 	@rm -rf $(BIN_DIR)
+	@rm -rf ./internal/mocks
+
+
+mock:
+	mockery --name=Server --dir=internal/server/server --output=internal/mocks --outpkg=mocks --filename=mock_server.go
+	mockery --name=Pool --dir=internal/balancer --output=internal/mocks --outpkg=mocks --filename=mock_pool.go
+	mockery --name=Policy --dir=internal/balancer --output=internal/mocks --outpkg=mocks --filename=mock_policy.go

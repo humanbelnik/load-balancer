@@ -59,6 +59,10 @@ func (s *ServerInst) SetAlive(alive bool) {
 
 func (s *ServerInst) Serve(w http.ResponseWriter, r *http.Request) error {
 	err := s.proxy.ServeAndReport(w, r)
+	/*
+		err != nil
+		on 5xx HTTP errors.
+	*/
 	if err != nil {
 		s.SetAlive(false)
 		return err
