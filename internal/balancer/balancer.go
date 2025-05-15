@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/humanbelnik/load-balancer/internal/server/server"
@@ -47,12 +48,13 @@ func New(pool Pool, policy Policy, opts ...Option) *Balancer {
 }
 
 func (b *Balancer) Serve(w http.ResponseWriter, r *http.Request) {
+	log.Println("serve!")
 	aliveServers, err := b.pool.Alive()
 	if err != nil {
 		http.Error(w, "no backends available", http.StatusServiceUnavailable)
 		return
 	}
-
+	fmt.Println(aliveServers)
 	for range aliveServers {
 		srv, err := b.policy.Select(aliveServers)
 		if err != nil {

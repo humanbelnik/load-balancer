@@ -32,7 +32,6 @@ func args() *config {
 func main() {
 	cfg := args()
 	appAddr := cfg.host + ":" + cfg.port
-
 	server, err := app.Setup(cfg.confpath, appAddr)
 	if err != nil {
 		log.Fatalf("%v", err)

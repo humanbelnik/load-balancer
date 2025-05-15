@@ -28,6 +28,7 @@ func Setup(configPath, addr string) (*http.Server, error) {
 
 	factory := factory.New()
 	p := dynamic_pool.New(factory)
+
 	if err := p.Update(urls); err != nil {
 		return nil, fmt.Errorf("update pool: %w", err)
 	}
@@ -39,7 +40,7 @@ func Setup(configPath, addr string) (*http.Server, error) {
 	// Configure load balancer
 	roundRobinPolicy := rr.New()
 	bal := balancer.New(p, roundRobinPolicy)
-
+	log.Println(addr)
 	return &http.Server{
 		Addr:    addr,
 		Handler: http.HandlerFunc(bal.Serve),
