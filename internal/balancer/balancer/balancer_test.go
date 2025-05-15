@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/humanbelnik/load-balancer/internal/mocks"
-	"github.com/humanbelnik/load-balancer/internal/server/server"
+	"github.com/humanbelnik/load-balancer/internal/balancer/mocks"
+	"github.com/humanbelnik/load-balancer/internal/balancer/server/server"
 )
 
 func makeMockServer(t *testing.T, code int, err error) *mocks.Server {

@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/humanbelnik/load-balancer/internal/balancer"
-	yaml_config "github.com/humanbelnik/load-balancer/internal/config/yaml"
-	"github.com/humanbelnik/load-balancer/internal/policy/rr"
-	"github.com/humanbelnik/load-balancer/internal/pool/config_watcher"
-	"github.com/humanbelnik/load-balancer/internal/pool/dynamic_pool"
-	"github.com/humanbelnik/load-balancer/internal/server/factory"
+	"github.com/humanbelnik/load-balancer/internal/balancer/balancer"
+	yaml_config "github.com/humanbelnik/load-balancer/internal/balancer/config/yaml"
+	"github.com/humanbelnik/load-balancer/internal/balancer/policy/rr"
+	"github.com/humanbelnik/load-balancer/internal/balancer/pool/config_watcher"
+	"github.com/humanbelnik/load-balancer/internal/balancer/pool/dynamic_pool"
+	"github.com/humanbelnik/load-balancer/internal/balancer/server/factory"
 )
 
 func Setup(configPath, addr string) (*http.Server, error) {

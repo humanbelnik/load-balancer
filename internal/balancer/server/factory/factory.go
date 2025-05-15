@@ -1,6 +1,6 @@
 package factory
 
-import "github.com/humanbelnik/load-balancer/internal/server/server"
+import "github.com/humanbelnik/load-balancer/internal/balancer/server/server"
 
 type Factory struct{}
 

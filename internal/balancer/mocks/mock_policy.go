@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	server "github.com/humanbelnik/load-balancer/internal/server/server"
+	server "github.com/humanbelnik/load-balancer/internal/balancer/server/server"
 	mock "github.com/stretchr/testify/mock"
 )
 

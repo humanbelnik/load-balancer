@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/humanbelnik/load-balancer/internal/server/proxy"
+	"github.com/humanbelnik/load-balancer/internal/balancer/server/proxy"
 )
 
 var ErrBrokenURL = errors.New("broken URL")

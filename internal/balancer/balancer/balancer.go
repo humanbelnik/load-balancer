@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/humanbelnik/load-balancer/internal/server/server"
+	"github.com/humanbelnik/load-balancer/internal/balancer/server/server"
 )
 
 /*
