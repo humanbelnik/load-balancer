@@ -3,6 +3,11 @@ BIN_NAME=lb
 BIN_DIR=bin
 CONFIG=./config/config.yaml
 
+PORT=8888
+HOST=localhost
+RLIMIT=true
+RLSTORE=ratelimiter.db
+
 .PHONY: all build run fmt lint test clean
 
 all: build
@@ -14,16 +19,7 @@ build:
 
 run:
 	@echo "Running..."
-	@go run $(MAIN_PKG) -config=$(CONFIG) -rlimit=true
-
-fmt:
-	@echo "Formatting..."
-	@go fmt ./...
-
-lint:
-	@echo "Linting..."
-	@go vet ./...
-	@which golint >/dev/null && golint ./... || echo "golint not installed"
+	@go run $(MAIN_PKG) -port=$(PORT) -host=$(HOST) -config=$(CONFIG) -rlimit=$(RLIMIT) -rlstore=$(RLSTORE)
 
 test: mock
 	@echo "Testing..."
@@ -34,21 +30,7 @@ clean:
 	@rm -rf $(BIN_DIR)
 	@rm -rf ./internal/mocks
 
-
 mock:
-	mockery --name=Server --dir=internal/server/server --output=internal/mocks --outpkg=mocks --filename=mock_server.go
-	mockery --name=Pool --dir=internal/balancer --output=internal/mocks --outpkg=mocks --filename=mock_pool.go
-	mockery --name=Policy --dir=internal/balancer --output=internal/mocks --outpkg=mocks --filename=mock_policy.go
-
-reload:
-	@if [ -z "$(PORT)" ]; then \
-		echo "Usage: make reload PORT=<port>"; \
-		exit 1; \
-	fi && \
-	PID=$$(lsof -t -i :$(PORT)) && \
-	if [ -z "$$PID" ]; then \
-		echo "No process found on port $(PORT)"; \
-		exit 1; \
-	fi && \
-	echo "Sending SIGHUP to PID $$PID (port $(PORT))" && \
-	kill -SIGHUP $$PID
+	mockery --name=Server --dir=internal/balancer/server/server --output=internal/mocks --outpkg=mocks --filename=mock_server.go
+	mockery --name=Pool --dir=internal/balancer/balancer --output=internal/mocks --outpkg=mocks --filename=mock_pool.go
+	mockery --name=Policy --dir=internal/balancer/balancer --output=internal/mocks --outpkg=mocks --filename=mock_policy.go
