@@ -16,27 +16,45 @@ import (
 	"github.com/humanbelnik/load-balancer/internal/balancer/pool/dynamic_pool"
 	"github.com/humanbelnik/load-balancer/internal/balancer/server/factory"
 	yaml_config "github.com/humanbelnik/load-balancer/internal/config/yaml"
+	api_ratelimiter "github.com/humanbelnik/load-balancer/internal/ratelimiter/api/http"
 	"github.com/humanbelnik/load-balancer/internal/ratelimiter/ratelimiter"
+	sqlite_storage "github.com/humanbelnik/load-balancer/internal/ratelimiter/storage/sqlite"
 )
 
 type Config struct {
-	Port     string
-	Host     string
-	Confpath string
-	Rlimit   bool
+	Port        string
+	Host        string
+	Confpath    string
+	Rlimit      bool
+	RlimitStore string
 }
 
-func setupBalancer(appCfg Config) ([]balancer.Option, error) {
+func setupBalancer(appCfg Config, mux *http.ServeMux) ([]balancer.Option, error) {
 	opts := []balancer.Option{}
 	if appCfg.Rlimit {
+		store, err := sqlite_storage.New(appCfg.RlimitStore)
+		if err != nil {
+			return nil, fmt.Errorf("rate limiter storage")
+		}
 		rlLoader := yaml_config.NewRateLimiterLoader()
 		cfg, err := rlLoader.Load(appCfg.Confpath)
 		if err != nil {
 			return nil, fmt.Errorf("rate limiter config")
 		}
-		rl := ratelimiter.New(cfg)
-		rl.SetClient("127.0.0.1", nil, nil)
+		rl := ratelimiter.New(cfg, store)
+		//rl.SetClient("127.0.0.1", nil, nil)
 		opts = append(opts, balancer.WithRateLimiter(rl))
+		api := api_ratelimiter.API{Limiter: rl}
+		mux.HandleFunc("/clients", func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodPost:
+				api.AddClient(w, r)
+			case http.MethodDelete:
+				api.DeleteClient(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		})
 	}
 	return opts, nil
 }
@@ -61,7 +79,8 @@ func Setup(appCfg Config) (*http.Server, error) {
 	watcher.Watch(appCfg.Confpath, p)
 
 	// Configure load balancer
-	balancerOpts, err := setupBalancer(appCfg)
+	mux := http.NewServeMux()
+	balancerOpts, err := setupBalancer(appCfg, mux)
 	if err != nil {
 		return nil, fmt.Errorf("setting up balancer options: %w", err)
 	}
@@ -70,9 +89,12 @@ func Setup(appCfg Config) (*http.Server, error) {
 	bal := balancer.New(p, roundRobinPolicy, balancerOpts...)
 	addr := appCfg.Host + ":" + appCfg.Port
 
+	// Configure API
+	mux.HandleFunc("/", bal.Serve)
+	http.HandleFunc("/", bal.Serve)
 	return &http.Server{
 		Addr:    addr,
-		Handler: http.HandlerFunc(bal.Serve),
+		Handler: mux,
 	}, nil
 }
 

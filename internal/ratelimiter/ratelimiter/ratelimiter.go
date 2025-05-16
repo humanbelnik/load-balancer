@@ -1,10 +1,17 @@
 package ratelimiter
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/humanbelnik/load-balancer/internal/ratelimiter/config"
+)
+
+var (
+	ErrAddIP    = errors.New("unable to add ip")
+	ErrRemoveIP = errors.New("unable to remove ip")
 )
 
 /*
@@ -19,6 +26,18 @@ type tokenBucket struct {
 	mu         sync.Mutex
 }
 
+type Storage interface {
+	Add(IP string, capacity int, refillEvery time.Duration) error
+	Delete(IP string) error
+	LoadAll() ([]ClientConfig, error)
+}
+
+type ClientConfig struct {
+	IP          string
+	Capacity    int
+	RefillEvery time.Duration
+}
+
 type Limiter struct {
 	cfg config.RateLimiterConfig
 
@@ -26,14 +45,16 @@ type Limiter struct {
 	mu      sync.RWMutex
 	ticker  *time.Ticker
 	quit    chan struct{}
+	store   Storage
 }
 
-func New(cfg config.RateLimiterConfig) *Limiter {
+func New(cfg config.RateLimiterConfig, store Storage) *Limiter {
 	rl := &Limiter{
 		cfg:     cfg,
 		clients: make(map[string]*tokenBucket),
 		ticker:  time.NewTicker(time.Duration(cfg.DefaultRefillRate)),
 		quit:    make(chan struct{}),
+		store:   store,
 	}
 
 	go rl.refillLoop()
@@ -68,7 +89,7 @@ func (rl *Limiter) refillLoop() {
 /*
 Use defaults for capacity && refill rate if not specified explicitly in parameters.
 */
-func (rl *Limiter) SetClient(ip string, capacity *int, rate *time.Duration) {
+func (rl *Limiter) SetClient(ip string, capacity *int, rate *time.Duration) error {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	var (
@@ -87,12 +108,29 @@ func (rl *Limiter) SetClient(ip string, capacity *int, rate *time.Duration) {
 		ref = *rate
 	}
 
+	if err := rl.store.Add(ip, cap, ref); err != nil {
+		return fmt.Errorf("%w: %w", ErrAddIP, err)
+	}
+
 	rl.clients[ip] = &tokenBucket{
 		capacity:   cap,
 		tokens:     cap,
 		refEvery:   ref,
 		lastRefill: time.Now(),
 	}
+	return nil
+}
+
+func (rl *Limiter) RemoveClient(ip string) error {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	if err := rl.store.Delete(ip); err != nil {
+		return fmt.Errorf("%w: %w", ErrRemoveIP, err)
+	}
+
+	delete(rl.clients, ip)
+	return nil
 }
 
 func (rl *Limiter) Allow(ip string) bool {
