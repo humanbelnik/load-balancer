@@ -1,8 +1,7 @@
 package balancer
 
 import (
-	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 
@@ -33,6 +32,7 @@ type Balancer struct {
 	pool    Pool
 	policy  Policy
 	ratelim RateLimiter
+	logger  *slog.Logger
 }
 
 type Option func(*Balancer)
@@ -40,6 +40,12 @@ type Option func(*Balancer)
 func WithRateLimiter(rl RateLimiter) Option {
 	return func(b *Balancer) {
 		b.ratelim = rl
+	}
+}
+
+func WithLogger(logger *slog.Logger) Option {
+	return func(b *Balancer) {
+		b.logger = logger
 	}
 }
 
@@ -51,6 +57,8 @@ func New(pool Pool, policy Policy, opts ...Option) *Balancer {
 	b := &Balancer{
 		pool:   pool,
 		policy: policy,
+		// If not specified in functional options - use default
+		logger: slog.Default(),
 	}
 
 	for _, opt := range opts {
@@ -60,13 +68,14 @@ func New(pool Pool, policy Policy, opts ...Option) *Balancer {
 }
 
 func (b *Balancer) Serve(w http.ResponseWriter, r *http.Request) {
+	b.logger.Info("handling request", slog.String("method", r.Method), slog.String("url", r.URL.String()), slog.String("client", r.RemoteAddr))
 	if b.ratelim != nil && !b.HasTicket(w, r) {
 		return
 	}
 
-	log.Println("serve!")
 	aliveServers, err := b.pool.Alive()
 	if err != nil {
+		b.logger.Error("no backends available", slog.Any("err", err))
 		http.Error(w, "no backends available", http.StatusServiceUnavailable)
 		return
 	}
@@ -78,16 +87,18 @@ func (b *Balancer) Serve(w http.ResponseWriter, r *http.Request) {
 	for range aliveServers {
 		srv, err := b.policy.Select(aliveServers)
 		if err != nil {
+			b.logger.Error("policy selection failed", slog.Any("err", err))
 			http.Error(w, "policy error", http.StatusServiceUnavailable)
 			return
 		}
 
 		err = srv.Serve(w, r)
 		if err == nil {
+			b.logger.Info("request served", slog.String("server", srv.URL()))
 			return
 		}
 
-		fmt.Printf("[WARN] server %s failed: %v — trying next\n", srv.URL(), err)
+		b.logger.Warn("backend failed", slog.String("server", srv.URL()), slog.Any("err", err))
 	}
 
 	http.Error(w, "all backends failed", http.StatusBadGateway)
@@ -99,11 +110,13 @@ Wrap rate limiter's work
 func (b *Balancer) HasTicket(w http.ResponseWriter, r *http.Request) bool {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
+		b.logger.Warn("malformed remote addr", slog.String("remote", r.RemoteAddr), slog.Any("err", err))
 		http.Error(w, "incorrect request", http.StatusBadRequest)
 		return false
 	}
 
 	if !b.ratelim.Allow(ip) {
+		b.logger.Info("rate limit exceeded", slog.String("ip", ip))
 		http.Error(w, "rate limit exeed", http.StatusTooManyRequests)
 		return false
 	}
