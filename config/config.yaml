@@ -2,3 +2,7 @@ servers:
   - http://localhost:9001
   - http://localhost:9002
   - http://localhost:9003
+
+rate_limiter:
+  default_capacity: 1
+  default_refill_rate: 5s

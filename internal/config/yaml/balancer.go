@@ -13,7 +13,7 @@ var (
 
 type YAMLLoader struct{}
 
-func New() *YAMLLoader {
+func NewBalancerLoader() *YAMLLoader {
 	return &YAMLLoader{}
 }
 

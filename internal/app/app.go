@@ -11,19 +11,20 @@ import (
 	"time"
 
 	"github.com/humanbelnik/load-balancer/internal/balancer/balancer"
-	yaml_config "github.com/humanbelnik/load-balancer/internal/balancer/config/yaml"
 	"github.com/humanbelnik/load-balancer/internal/balancer/policy/rr"
 	"github.com/humanbelnik/load-balancer/internal/balancer/pool/config_watcher"
 	"github.com/humanbelnik/load-balancer/internal/balancer/pool/dynamic_pool"
 	"github.com/humanbelnik/load-balancer/internal/balancer/server/factory"
+	yaml_config "github.com/humanbelnik/load-balancer/internal/config/yaml"
+	"github.com/humanbelnik/load-balancer/internal/ratelimiter/ratelimiter"
 )
 
 func Setup(configPath, addr string) (*http.Server, error) {
 	// Manually load config and setup server pool on the launch
-	loader := &yaml_config.YAMLLoader{}
+	loader := yaml_config.NewBalancerLoader()
 	urls, err := loader.Load(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
+		return nil, fmt.Errorf("load balancer config: %w", err)
 	}
 
 	factory := factory.New()
@@ -37,9 +38,18 @@ func Setup(configPath, addr string) (*http.Server, error) {
 	watcher := config_watcher.New(loader, config_watcher.DefaultOnError)
 	watcher.Watch(configPath, p)
 
+	// Rate limiter
+	rlLoader := yaml_config.NewRateLimiterLoader()
+	cfg, err := rlLoader.Load(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("rate limiter config")
+	}
+	rl := ratelimiter.New(cfg)
+	rl.SetClient("127.0.0.1", nil, nil)
+
 	// Configure load balancer
 	roundRobinPolicy := rr.New()
-	bal := balancer.New(p, roundRobinPolicy)
+	bal := balancer.New(p, roundRobinPolicy, balancer.WithRateLimiter(rl))
 	log.Println(addr)
 	return &http.Server{
 		Addr:    addr,
