@@ -7,32 +7,27 @@ import (
 	"github.com/humanbelnik/load-balancer/internal/app"
 )
 
-type config struct {
-	port     string
-	host     string
-	confpath string
-}
-
-func args() *config {
+func args() app.Config {
 	var (
 		port     = flag.String("port", "8080", "Port to listen on")
 		host     = flag.String("host", "localhost", "Host to bind")
 		confpath = flag.String("config", "./config/config.yaml", "Path to backend servers config file")
+		rlimit   = flag.Bool("rlimit", false, "Enable rate limiter")
 	)
 	flag.Parse()
-	log.Printf("using: port=%s, host=%s, config=%s", *port, *host, *confpath)
+	log.Printf("using: port=%s, host=%s, config=%s, with-rate-limiting=%v", *port, *host, *confpath, *rlimit)
 
-	return &config{
-		port:     *port,
-		host:     *host,
-		confpath: *confpath,
+	return app.Config{
+		Port:     *port,
+		Host:     *host,
+		Confpath: *confpath,
+		Rlimit:   *rlimit,
 	}
 }
 
 func main() {
 	cfg := args()
-	appAddr := cfg.host + ":" + cfg.port
-	server, err := app.Setup(cfg.confpath, appAddr)
+	server, err := app.Setup(cfg)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

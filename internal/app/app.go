@@ -19,10 +19,32 @@ import (
 	"github.com/humanbelnik/load-balancer/internal/ratelimiter/ratelimiter"
 )
 
-func Setup(configPath, addr string) (*http.Server, error) {
+type Config struct {
+	Port     string
+	Host     string
+	Confpath string
+	Rlimit   bool
+}
+
+func setupBalancer(appCfg Config) ([]balancer.Option, error) {
+	opts := []balancer.Option{}
+	if appCfg.Rlimit {
+		rlLoader := yaml_config.NewRateLimiterLoader()
+		cfg, err := rlLoader.Load(appCfg.Confpath)
+		if err != nil {
+			return nil, fmt.Errorf("rate limiter config")
+		}
+		rl := ratelimiter.New(cfg)
+		rl.SetClient("127.0.0.1", nil, nil)
+		opts = append(opts, balancer.WithRateLimiter(rl))
+	}
+	return opts, nil
+}
+
+func Setup(appCfg Config) (*http.Server, error) {
 	// Manually load config and setup server pool on the launch
 	loader := yaml_config.NewBalancerLoader()
-	urls, err := loader.Load(configPath)
+	urls, err := loader.Load(appCfg.Confpath)
 	if err != nil {
 		return nil, fmt.Errorf("load balancer config: %w", err)
 	}
@@ -36,21 +58,18 @@ func Setup(configPath, addr string) (*http.Server, error) {
 
 	// Watch after SIGHUPs
 	watcher := config_watcher.New(loader, config_watcher.DefaultOnError)
-	watcher.Watch(configPath, p)
-
-	// Rate limiter
-	rlLoader := yaml_config.NewRateLimiterLoader()
-	cfg, err := rlLoader.Load(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("rate limiter config")
-	}
-	rl := ratelimiter.New(cfg)
-	rl.SetClient("127.0.0.1", nil, nil)
+	watcher.Watch(appCfg.Confpath, p)
 
 	// Configure load balancer
+	balancerOpts, err := setupBalancer(appCfg)
+	if err != nil {
+		return nil, fmt.Errorf("setting up balancer options: %w", err)
+	}
+
 	roundRobinPolicy := rr.New()
-	bal := balancer.New(p, roundRobinPolicy, balancer.WithRateLimiter(rl))
-	log.Println(addr)
+	bal := balancer.New(p, roundRobinPolicy, balancerOpts...)
+	addr := appCfg.Host + ":" + appCfg.Port
+
 	return &http.Server{
 		Addr:    addr,
 		Handler: http.HandlerFunc(bal.Serve),

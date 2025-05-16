@@ -14,7 +14,7 @@ build:
 
 run:
 	@echo "Running..."
-	@go run $(MAIN_PKG) -config=$(CONFIG)
+	@go run $(MAIN_PKG) -config=$(CONFIG) -rlimit=true
 
 fmt:
 	@echo "Formatting..."
